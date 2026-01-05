@@ -185,32 +185,6 @@ def initialize_trees(num_trees, existing_trees=None):
                             yoff=float(py * scale_factor),
                         )
 
-                        # Looking for nearby objects
-                        possible_indices = tree_index.query(candidate_poly)
-                        # This is the collision detection step
-                        if any(
-                            (
-                                candidate_poly.intersects(placed_polygons[i])
-                                and not candidate_poly.touches(placed_polygons[i])
-                            )
-                            for i in possible_indices
-                        ):
-                            collision_found = True
-                            break
-                        radius -= step_in
-
-                    # back up in steps of 0.05 until it no longer has a collision.
-                    if collision_found:
-                        step_out += step_out
-                        px = radius * vx
-                        py = radius * vy
-
-                        candidate_poly = affinity.translate(
-                            tree_to_place.polygon,
-                            xoff=float(px * scale_factor),
-                            yoff=float(py * scale_factor),
-                        )
-
                         possible_indices = tree_index.query(candidate_poly)
                         if not any(
                             (
