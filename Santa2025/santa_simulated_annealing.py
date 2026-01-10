@@ -13,13 +13,16 @@ def _():
     import time
     import numpy as np
     import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    import pandas as pd
+
     from decimal import Decimal, getcontext
-    from shapely import affinity
     from shapely.geometry import Polygon
     from shapely.ops import unary_union
     from matplotlib.patches import Rectangle
+    from shapely import affinity, touches
+    from shapely.strtree import STRtree
     from matplotlib.animation import FuncAnimation
-    import matplotlib.patches as mpatches
 
     getcontext().prec = 25
     scale_factor = Decimal("1e15")
@@ -31,6 +34,7 @@ def _():
         math,
         mpatches,
         np,
+        pd,
         plt,
         random,
         scale_factor,
@@ -943,301 +947,137 @@ def _(ChristmasTree, SimulatedAnnealing, TreePackingProblem):
 
 @app.cell
 def _(ChristmasTree, Decimal, SingleBlockProblem, TwoBlockProblem, math):
-    def _():
-        # Function for rotating a pair of trees by a given angle around their center
-        def apply_rotation_test(trees, angle_deg):
-            """Rotates a pair of trees by angle_deg degrees around their common center."""
-            if len(trees) == 0:
-                return trees, (Decimal("0"), Decimal("0"))
-        
-            # Calculate center of mass of all trees
-            center_x = sum(tree.center_x for tree in trees) / Decimal(str(len(trees)))
-            center_y = sum(tree.center_y for tree in trees) / Decimal(str(len(trees)))
-        
-            # Rotate each tree around this center
-            rotated_trees = []
-            for tree in trees:
-                # Get current coordinates relative to center
-                rel_x = tree.center_x - center_x
-                rel_y = tree.center_y - center_y
-            
-                # Rotate by angle_deg degrees
-                angle_rad = Decimal(str(angle_deg)) * Decimal(str(math.pi)) / Decimal("180")
-                cos_a = Decimal(str(math.cos(float(angle_rad))))
-                sin_a = Decimal(str(math.sin(float(angle_rad))))
-            
-                new_rel_x = rel_x * cos_a - rel_y * sin_a
-                new_rel_y = rel_x * sin_a + rel_y * cos_a
-            
-                # New absolute coordinates
-                new_x = center_x + new_rel_x
-                new_y = center_y + new_rel_y
-            
-                # New angle
-                new_angle = (Decimal(str(tree.angle)) + Decimal(str(angle_deg))) % 360
-            
-                # Create new tree
-                rotated_tree = ChristmasTree(str(new_x), str(new_y), str(new_angle))
-                rotated_trees.append(rotated_tree)
-        
-            return rotated_trees, (center_x, center_y)
+    # Function for rotating a pair of trees by a given angle around their center
+    def apply_rotation_test(trees, angle_deg):
+        """Rotates a pair of trees by angle_deg degrees around their common center."""
+        if len(trees) == 0:
+            return trees, (Decimal("0"), Decimal("0"))
 
-        # Create initial pairs for each block
-        # Block 1: 6x14
-        initial_trees_block1 = []
-        for x, y, deg in [(-2.93069232+4.5, -4.24856960 + 6, 67), (-3.92971914+4.5, -4.16631769 + 6, 250.00)]:
-            initial_trees_block1.append(ChristmasTree(str(x), str(y), str(deg)))
+        # Calculate center of mass of all trees
+        center_x = sum(tree.center_x for tree in trees) / Decimal(str(len(trees)))
+        center_y = sum(tree.center_y for tree in trees) / Decimal(str(len(trees)))
+
+        # Rotate each tree around this center
+        rotated_trees = []
+        for tree in trees:
+            # Get current coordinates relative to center
+            rel_x = tree.center_x - center_x
+            rel_y = tree.center_y - center_y
+    
+            # Rotate by angle_deg degrees
+            angle_rad = Decimal(str(angle_deg)) * Decimal(str(math.pi)) / Decimal("180")
+            cos_a = Decimal(str(math.cos(float(angle_rad))))
+            sin_a = Decimal(str(math.sin(float(angle_rad))))
+    
+            new_rel_x = rel_x * cos_a - rel_y * sin_a
+            new_rel_y = rel_x * sin_a + rel_y * cos_a
+    
+            # New absolute coordinates
+            new_x = center_x + new_rel_x
+            new_y = center_y + new_rel_y
+    
+            # New angle
+            new_angle = (Decimal(str(tree.angle)) + Decimal(str(angle_deg))) % 360
+    
+            # Create new tree
+            rotated_tree = ChristmasTree(str(new_x), str(new_y), str(new_angle))
+            rotated_trees.append(rotated_tree)
+
+        return rotated_trees, (center_x, center_y)
+
+    # Create initial pairs for each block
+    # Block 1: 6x14
+    initial_trees_block1 = []
+    for _x, _y, _deg in [(-2.93069232+4.5, -4.24856960 + 6, 67), (-3.92971914+4.5, -4.16631769 + 6, 250.00)]:
+        initial_trees_block1.append(ChristmasTree(str(_x), str(_y), str(_deg)))
         initial_pair1 = initial_trees_block1
 
-        # Block 2: 1x7 (rotated 90 degrees)
-        initial_trees_block2 = []
-        for x, y, deg in [(-2.93069232+4.5, -4.24856960 + 9, 67), (-3.92971914+4.5, -4.16631769 + 9, 250.00)]:
-            initial_trees_block2.append(ChristmasTree(str(x), str(y), str(deg)))
+    # Block 2: 1x7 (rotated 90 degrees)
+    initial_trees_block2 = []
+    for _x, _y, _deg in [(-2.93069232+4.5, -4.24856960 + 9, 67), (-3.92971914+4.5, -4.16631769 + 9, 250.00)]:
+        initial_trees_block2.append(ChristmasTree(str(_x), str(_y), str(_deg)))
 
-        # Rotate second pair by 90 degrees
-        initial_pair2, rotation_center = apply_rotation_test(initial_trees_block1, 90)
-        print(f"Rotation center for block 2: {rotation_center}")
+    # Rotate second pair by 90 degrees
+    initial_pair2, rotation_center = apply_rotation_test(initial_trees_block1, 90)
+    print(f"Rotation center for block 2: {rotation_center}")
 
-        # Create two simple problems (blocks)
-        # Block 1: a = 0.8744896974945239, b = 0.7499641699190263
-        block1_problem = SingleBlockProblem(
-            initial_pair=initial_pair1,
-            ncols=4,
-            nrows=10,
-            initial_a=0.8744896974945239+0.5,
-            initial_b=0.7499641699190263-0.1,
-            position_delta=0.002,
-            angle_delta=1.0,
-            delta_t=0.002,
-        )
+    # Create two simple problems (blocks)
+    # Block 1: a = 0.8744896974945239, b = 0.7499641699190263
+    block1_problem = SingleBlockProblem(
+        initial_pair=initial_pair1,
+        ncols=4,
+        nrows=10,
+        initial_a=0.8744896974945239+0.5,
+        initial_b=0.7499641699190263-0.1,
+        position_delta=0.002,
+        angle_delta=1.0,
+        delta_t=0.002,
+    )
 
-        # Block 2: a and b are swapped
-        block2_problem = SingleBlockProblem(
-            initial_pair=initial_pair2,
-            ncols=1,
-            nrows=4,
-            initial_a=0.7499641699190263-0.1,  # b from block 1
-            initial_b=0.8744896974945239+0.5,  # a from block 1
-            position_delta=0.002,
-            angle_delta=1.0,
-            delta_t=0.002,
-        )
+    # Block 2: a and b are swapped
+    block2_problem = SingleBlockProblem(
+        initial_pair=initial_pair2,
+        ncols=1,
+        nrows=4,
+        initial_a=0.7499641699190263-0.1,  # b from block 1
+        initial_b=0.8744896974945239+0.5,  # a from block 1
+        position_delta=0.002,
+        angle_delta=1.0,
+        delta_t=0.002,
+    )
 
-        # Create meta-problem that combines two blocks
-        two_block_problem = TwoBlockProblem(block1_problem, block2_problem)
+    # Create meta-problem that combines two blocks
+    two_block_problem = TwoBlockProblem(block1_problem, block2_problem)
 
-        print("Two-block problem created:")
-        print(f"  Block 1: {block1_problem.ncols} columns x {block1_problem.nrows} rows = {block1_problem.ncols * block1_problem.nrows * 2} trees")
-        print(f"  Block 2: {block2_problem.ncols} columns x {block2_problem.nrows} rows = {block2_problem.ncols * block2_problem.nrows * 2} trees")
-        return print(f"  Total: {(block1_problem.ncols * block1_problem.nrows + block2_problem.ncols * block2_problem.nrows) * 2} trees")
+    print("Two-block problem created:")
+    print(f"  Block 1: {block1_problem.ncols} columns x {block1_problem.nrows} rows = {block1_problem.ncols * block1_problem.nrows * 2} trees")
+    print(f"  Block 2: {block2_problem.ncols} columns x {block2_problem.nrows} rows = {block2_problem.ncols * block2_problem.nrows * 2} trees")
+    print(f"  Total: {(block1_problem.ncols * block1_problem.nrows + block2_problem.ncols * block2_problem.nrows) * 2} trees")
+    return (two_block_problem,)
 
 
-    _()
-    return
+@app.cell
+def _(SimulatedAnnealing, two_block_problem):
+    # Create SA algorithm for two-block problem
+    sa_two_blocks = SimulatedAnnealing(
+        problem=two_block_problem,
+        initial_temperature=0.01,      # Tmax
+        min_temperature=0.000001,         # Tmin
+        cooling_rate=0.99,              # alpha
+        passes=10,                      # nsteps
+        iterations_per_pass=10000,       # nsteps_per_T
+        random_state=42,                # Seed for reproducibility
+        verbose=True,                   # Detailed logging
+    )
+
+    # Run optimization
+    print("\nStarting two-block optimization...\n")
+    best_value_2blocks, best_state_2blocks = sa_two_blocks.solve()
+
+    # Visualize optimization history
+    sa_two_blocks.plot_history(save_path="sa_two_blocks_history.png")
+
+    # Visualize result
+    print(f"\nFinal best value: {float(best_value_2blocks):.6f}")
+    sa_two_blocks.plot_final_result(best_state_2blocks, save_path="sa_two_blocks_result.png")
+
+    # Get the final list of trees from the optimized state
+    final_trees_2blocks = two_block_problem.translate(best_state_2blocks)
+    return best_value_2blocks, final_trees_2blocks
 
 
 @app.cell
 def _(
     ChristmasTree,
     Decimal,
-    SimulatedAnnealing,
-    SingleBlockProblem,
-    TwoBlockProblem,
-    math,
+    Rectangle,
+    best_value_2blocks,
+    final_trees_2blocks,
+    pd,
+    plt,
+    scale_factor,
+    unary_union,
 ):
-    def _():
-        # Function for rotating a pair of trees by a given angle around their center
-        def apply_rotation_test(trees, angle_deg):
-            """Rotates a pair of trees by angle_deg degrees around their common center."""
-            if len(trees) == 0:
-                return trees, (Decimal("0"), Decimal("0"))
-        
-            # Calculate center of mass of all trees
-            center_x = sum(tree.center_x for tree in trees) / Decimal(str(len(trees)))
-            center_y = sum(tree.center_y for tree in trees) / Decimal(str(len(trees)))
-        
-            # Rotate each tree around this center
-            rotated_trees = []
-            for tree in trees:
-                # Get current coordinates relative to center
-                rel_x = tree.center_x - center_x
-                rel_y = tree.center_y - center_y
-            
-                # Rotate by angle_deg degrees
-                angle_rad = Decimal(str(angle_deg)) * Decimal(str(math.pi)) / Decimal("180")
-                cos_a = Decimal(str(math.cos(float(angle_rad))))
-                sin_a = Decimal(str(math.sin(float(angle_rad))))
-            
-                new_rel_x = rel_x * cos_a - rel_y * sin_a
-                new_rel_y = rel_x * sin_a + rel_y * cos_a
-            
-                # New absolute coordinates
-                new_x = center_x + new_rel_x
-                new_y = center_y + new_rel_y
-            
-                # New angle
-                new_angle = (Decimal(str(tree.angle)) + Decimal(str(angle_deg))) % 360
-            
-                # Create new tree
-                rotated_tree = ChristmasTree(str(new_x), str(new_y), str(new_angle))
-                rotated_trees.append(rotated_tree)
-        
-            return rotated_trees, (center_x, center_y)
-
-        # Create initial pairs for each block
-        # Block 1: 6x14
-        initial_trees_block1 = []
-        for x, y, deg in [(-2.93069232+4.5, -4.24856960 + 6, 67), (-3.92971914+4.5, -4.16631769 + 6, 250.00)]:
-            initial_trees_block1.append(ChristmasTree(str(x), str(y), str(deg)))
-        initial_pair1 = initial_trees_block1
-
-        # Block 2: 1x7 (rotated 90 degrees)
-        initial_trees_block2 = []
-        for x, y, deg in [(-2.93069232+4.5, -4.24856960 + 9, 67), (-3.92971914+4.5, -4.16631769 + 9, 250.00)]:
-            initial_trees_block2.append(ChristmasTree(str(x), str(y), str(deg)))
-
-        # Rotate second pair by 90 degrees
-        initial_pair2, rotation_center = apply_rotation_test(initial_trees_block1, 90)
-        print(f"Rotation center for block 2: {rotation_center}")
-
-        # Create two simple problems (blocks)
-        # Block 1: a = 0.8744896974945239, b = 0.7499641699190263
-        block1_problem = SingleBlockProblem(
-            initial_pair=initial_pair1,
-            ncols=4,
-            nrows=10,
-            initial_a=0.8744896974945239+0.5,
-            initial_b=0.7499641699190263-0.1,
-            position_delta=0.002,
-            angle_delta=1.0,
-            delta_t=0.002,
-        )
-
-        # Block 2: a and b are swapped
-        block2_problem = SingleBlockProblem(
-            initial_pair=initial_pair2,
-            ncols=1,
-            nrows=4,
-            initial_a=0.7499641699190263-0.1,  # b from block 1
-            initial_b=0.8744896974945239+0.5,  # a from block 1
-            position_delta=0.002,
-            angle_delta=1.0,
-            delta_t=0.002,
-        )
-
-        # Create meta-problem that combines two blocks
-        two_block_problem = TwoBlockProblem(block1_problem, block2_problem)
-
-        #print("Two-block problem created:")
-        #print(f"  Block 1: {block1_problem.ncols} columns x {block1_problem.nrows} rows = {block1_problem.ncols * block1_problem.nrows * 2} trees")
-        #print(f"  Block 2: {block2_problem.ncols} columns x {block2_problem.nrows} rows = {block2_problem.ncols * block2_problem.nrows * 2} trees")
-        #return print(f"  Total: {(block1_problem.ncols * block1_problem.nrows + block2_problem.ncols * block2_problem.nrows) * 2} trees")
-
-        # Create SA algorithm for two-block problem
-        sa_two_blocks = SimulatedAnnealing(
-            problem=two_block_problem,
-            initial_temperature=0.01,      # Tmax
-            min_temperature=0.000001,         # Tmin
-            cooling_rate=0.99,              # alpha
-            passes=10,                      # nsteps
-            iterations_per_pass=10000,       # nsteps_per_T
-            random_state=42,                # Seed for reproducibility
-            verbose=True,                   # Detailed logging
-        )
-    
-        # Run optimization
-        print("\nStarting two-block optimization...\n")
-        best_value_2blocks, best_state_2blocks = sa_two_blocks.solve()
-
-        # Visualize optimization history
-        sa_two_blocks.plot_history(save_path="sa_two_blocks_history.png")
-    
-        # Visualize result
-        print(f"\nFinal best value: {float(best_value_2blocks):.6f}")
-        sa_two_blocks.plot_final_result(best_state_2blocks, save_path="sa_two_blocks_result.png")
-    
-        # Get the final list of trees from the optimized state
-        final_trees_2blocks = two_block_problem.translate(best_state_2blocks)
-
-    _()
-
-
-    return
-
-
-@app.cell
-def _(best_value_2blocks, final_trees_2blocks):
-    import pandas as pd
-    from decimal import Decimal, getcontext
-    from shapely import affinity, touches
-    from shapely.geometry import Polygon
-    from shapely.ops import unary_union
-    from shapely.strtree import STRtree
-
-    getcontext().prec = 25
-    scale_factor = Decimal("1e15")
-
-    class ChristmasTree:
-        """Represents a single, rotatable Christmas tree of a fixed size."""
-
-        def __init__(self, center_x='0', center_y='0', angle='0'):
-            """Initializes the Christmas tree with a specific position and rotation."""
-            self.center_x = Decimal(center_x)
-            self.center_y = Decimal(center_y)
-            self.angle = Decimal(angle)
-
-            trunk_w = Decimal('0.15')
-            trunk_h = Decimal('0.2')
-            base_w = Decimal('0.7')
-            mid_w = Decimal('0.4')
-            top_w = Decimal('0.25')
-            tip_y = Decimal('0.8')
-            tier_1_y = Decimal('0.5')
-            tier_2_y = Decimal('0.25')
-            base_y = Decimal('0.0')
-            trunk_bottom_y = -trunk_h
-
-            initial_polygon = Polygon(
-                [
-                    # Start at Tip
-                    (Decimal('0.0') * scale_factor, tip_y * scale_factor),
-                    # Right side - Top Tier
-                    (top_w / Decimal('2') * scale_factor, tier_1_y * scale_factor),
-                    (top_w / Decimal('4') * scale_factor, tier_1_y * scale_factor),
-                    # Right side - Middle Tier
-                    (mid_w / Decimal('2') * scale_factor, tier_2_y * scale_factor),
-                    (mid_w / Decimal('4') * scale_factor, tier_2_y * scale_factor),
-                    # Right side - Bottom Tier
-                    (base_w / Decimal('2') * scale_factor, base_y * scale_factor),
-                    # Right Trunk
-                    (trunk_w / Decimal('2') * scale_factor, base_y * scale_factor),
-                    (trunk_w / Decimal('2') * scale_factor, trunk_bottom_y * scale_factor),
-                    # Left Trunk
-                    (-(trunk_w / Decimal('2')) * scale_factor, trunk_bottom_y * scale_factor),
-                    (-(trunk_w / Decimal('2')) * scale_factor, base_y * scale_factor),
-                    # Left side - Bottom Tier
-                    (-(base_w / Decimal('2')) * scale_factor, base_y * scale_factor),
-                    # Left side - Middle Tier
-                    (-(mid_w / Decimal('4')) * scale_factor, tier_2_y * scale_factor),
-                    (-(mid_w / Decimal('2')) * scale_factor, tier_2_y * scale_factor),
-                    # Left side - Top Tier
-                    (-(top_w / Decimal('4')) * scale_factor, tier_1_y * scale_factor),
-                    (-(top_w / Decimal('2')) * scale_factor, tier_1_y * scale_factor),
-                ]
-            )
-            rotated = affinity.rotate(initial_polygon, float(self.angle), origin=(0, 0))
-            self.polygon = affinity.translate(rotated,
-                                              xoff=float(self.center_x * scale_factor),
-                                              yoff=float(self.center_y * scale_factor))
-        
-
-        def clone(self) -> "ChristmasTree":
-            return ChristmasTree(
-                center_x=str(self.center_x),
-                center_y=str(self.center_y),
-                angle=str(self.angle),
-            )    
-
     def get_tree_list_side_lenght(tree_list: list[ChristmasTree]) -> Decimal:
         all_polygons = [t.polygon for t in tree_list]
         bounds = unary_union(all_polygons).bounds
@@ -1249,8 +1089,6 @@ def _(best_value_2blocks, final_trees_2blocks):
             score += v ** 2 / Decimal(k)
         return score
 
-    import matplotlib.pyplot as plt
-    from matplotlib.patches import Rectangle
 
     def plot_layout(ax, placed_trees, title):
         num_trees = len(placed_trees)
@@ -1348,20 +1186,15 @@ def _(best_value_2blocks, final_trees_2blocks):
                 'deg': f's{tree.angle}'
             })
     tree_data = pd.DataFrame(tree_data)
-    tree_data.to_csv('results.csv', index=False) 
+    tree_data.to_csv('results.csv', index=False)
+    return (parse_csv,)
 
 
-
-    return (
-        ChristmasTree,
-        Decimal,
-        Polygon,
-        Rectangle,
-        affinity,
-        plt,
-        scale_factor,
-        unary_union,
-    )
+@app.cell
+def _(parse_csv):
+    current_solution_path = '/kaggle/input/santa2025-packed-version-of-current-best-public/submission_best.csv'
+    dict_of_tree_list, dict_of_side_length = parse_csv(current_solution_path)
+    return
 
 
 if __name__ == "__main__":
