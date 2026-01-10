@@ -1166,7 +1166,8 @@ def _(
         return dict_of_tree_list, dict_of_side_length
 
     # Load current best solution
-    current_solution_path = '/kaggle/input/santa2025-packed-version-of-current-best-public/submission_best.csv'
+    current_solution_path = './submission_best.csv'
+    # current_solution_path = '/kaggle/input/santa2025-packed-version-of-current-best-public/submission_best.csv'
     dict_of_tree_list, dict_of_side_length = parse_csv(current_solution_path)
 
     dict_of_tree_list['088'] = final_trees_2blocks
@@ -1187,13 +1188,6 @@ def _(
             })
     tree_data = pd.DataFrame(tree_data)
     tree_data.to_csv('results.csv', index=False)
-    return (parse_csv,)
-
-
-@app.cell
-def _(parse_csv):
-    current_solution_path = '/kaggle/input/santa2025-packed-version-of-current-best-public/submission_best.csv'
-    dict_of_tree_list, dict_of_side_length = parse_csv(current_solution_path)
     return
 
 
