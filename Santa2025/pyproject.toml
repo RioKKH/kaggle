@@ -5,10 +5,13 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "basedpyright>=1.37.1",
     "kaggle>=1.8.3",
     "marimo>=0.18.4",
     "matplotlib>=3.10.8",
     "numpy>=2.4.0",
     "pandas>=2.3.3",
+    "python-lsp-server>=1.14.0",
     "shapely>=2.1.2",
+    "ty>=0.0.11",
 ]

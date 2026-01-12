@@ -16,6 +16,8 @@ def _():
     import matplotlib.patches as mpatches
     import pandas as pd
 
+    from abc import ABC
+    from abc import abstractmethod
     from decimal import Decimal, getcontext
     from shapely.geometry import Polygon
     from shapely.ops import unary_union
@@ -27,9 +29,11 @@ def _():
     getcontext().prec = 25
     scale_factor = Decimal("1e15")
     return (
+        ABC,
         Decimal,
         Polygon,
         Rectangle,
+        abstractmethod,
         affinity,
         math,
         mpatches,
@@ -110,9 +114,7 @@ def _(Decimal, Polygon, affinity, scale_factor):
 
 
 @app.cell
-def _():
-    from abc import ABC, abstractmethod
-
+def _(ABC, abstractmethod):
     class Problem(ABC):
         """
         Abstract class for an optimization problem.
@@ -165,7 +167,7 @@ def _(ChristmasTree, Decimal, Problem, np, random):
             'b': Decimal             # Grid step in Y
         }
         """
-    
+
         def __init__(self, initial_pair, ncols, nrows, initial_a, initial_b, 
                      position_delta=0.002, angle_delta=1.0, delta_t=0.002):
             """
@@ -182,17 +184,17 @@ def _(ChristmasTree, Decimal, Problem, np, random):
             # Save initial a and b
             self.initial_a = Decimal(str(initial_a))
             self.initial_b = Decimal(str(initial_b))
-    
+
         def get_initial_state(self):
             """Returns initial state: pair and initial a, b."""
             pair_trees = [tree.clone() for tree in self.initial_pair]
-        
+
             return {
                 'pair': pair_trees,
                 'a': self.initial_a,
                 'b': self.initial_b
             }
-    
+
         def translate(self, state, offset_x=Decimal("0"), offset_y=Decimal("0")):
             """
             Builds a grid from a pair with steps a and b.
@@ -202,7 +204,7 @@ def _(ChristmasTree, Decimal, Problem, np, random):
             pair = state['pair']
             a = state['a']
             b = state['b']
-        
+
             grid_trees = []
             for row in range(self.nrows):
                 for col in range(self.ncols):
@@ -211,9 +213,9 @@ def _(ChristmasTree, Decimal, Problem, np, random):
                         new_x = tree.center_x + Decimal(col) * a + offset_x
                         new_y = tree.center_y + Decimal(row) * b + offset_y
                         grid_trees.append(ChristmasTree(str(new_x), str(new_y), str(tree.angle)))
-        
+
             return grid_trees
-    
+
         def perturb(self, state):
             """
             Modifies state: either pair parameters or a, b.
@@ -221,13 +223,13 @@ def _(ChristmasTree, Decimal, Problem, np, random):
             """
             # Choose change type: 0-1 = tree in pair, 2 = a, 3 = b, 4 = rotate_all
             move_type = random.randint(0, 4)
-        
+
             if move_type < 2:
                 # Modify one tree in the pair
                 tree_idx = move_type
                 tree = state['pair'][tree_idx]
                 old_params = tree.get_params()
-            
+
                 dx = Decimal(str(random.uniform(-float(self.position_delta), float(self.position_delta))))
                 dy = Decimal(str(random.uniform(-float(self.position_delta), float(self.position_delta))))
                 dangle = Decimal(str(random.uniform(-float(self.angle_delta), float(self.angle_delta))))
@@ -235,9 +237,9 @@ def _(ChristmasTree, Decimal, Problem, np, random):
                 new_y = tree.center_y + dy
                 new_angle = (Decimal(str(tree.angle)) + dangle) % 360
                 tree.set_params(new_x, new_y, new_angle)
-            
+
                 return state, ('tree', tree_idx, old_params)
-        
+
             elif move_type == 2:
                 # Modify a
                 old_a = state['a']
@@ -247,7 +249,7 @@ def _(ChristmasTree, Decimal, Problem, np, random):
                     new_a = old_a
                 state['a'] = new_a
                 return state, ('a', old_a)
-        
+
             elif move_type == 3:
                 # Modify b
                 old_b = state['b']
@@ -257,7 +259,7 @@ def _(ChristmasTree, Decimal, Problem, np, random):
                     new_b = old_b
                 state['b'] = new_b
                 return state, ('b', old_b)
-        
+
             else:  # move_type == 4
                 # Rotate all trees in the pair by one angle
                 old_angles = [Decimal(str(tree.angle)) for tree in state['pair']]
@@ -266,12 +268,12 @@ def _(ChristmasTree, Decimal, Problem, np, random):
                     new_angle = (Decimal(str(tree.angle)) + dangle) % 360
                     tree.set_params(tree.center_x, tree.center_y, new_angle)
                 return state, ('rotate_all', old_angles)
-    
+
         def rollback(self, state, rollback_data):
             """Rolls back the state change."""
             if rollback_data is None:
                 return
-        
+
             if rollback_data[0] == 'tree':
                 _, tree_idx, old_params = rollback_data
                 state['pair'][tree_idx].set_params(*old_params)
@@ -285,7 +287,7 @@ def _(ChristmasTree, Decimal, Problem, np, random):
                 _, old_angles = rollback_data
                 for i, tree in enumerate(state['pair']):
                     tree.set_params(tree.center_x, tree.center_y, old_angles[i])
-    
+
         def evaluate(self, state, offset_x=Decimal("0"), offset_y=Decimal("0")):
             """Calculates the bounding square side for the block (lower = better)."""
             grid_trees = self.translate(state, offset_x, offset_y)
@@ -297,7 +299,7 @@ def _(ChristmasTree, Decimal, Problem, np, random):
             width = Decimal(str(max_x - min_x))
             height = Decimal(str(max_y - min_y))
             return max(width, height)
-    
+
         def is_valid(self, state, offset_x=Decimal("0"), offset_y=Decimal("0")):
             """Checks if there are no overlaps in the block."""
             grid_trees = self.translate(state, offset_x, offset_y)
@@ -309,7 +311,7 @@ def _(ChristmasTree, Decimal, Problem, np, random):
                         if tree1.polygon.intersects(tree2.polygon) and not tree1.polygon.touches(tree2.polygon):
                             return False
             return True
-    
+
         def clone_state(self, state):
             """Creates a copy of the state."""
             return {
@@ -330,21 +332,20 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
         def translate(self, state, offset_x=Decimal("0"), offset_y=Decimal("0")):
             """Builds a grid from a pair with steps a and b (can accept offset for compatibility)."""
             return super().translate(state, offset_x, offset_y)
-    
+
         def evaluate(self, state):
             """Calculates the bounding square side for the grid (lower = better)."""
             return super().evaluate(state, Decimal("0"), Decimal("0"))
-    
+
         def is_valid(self, state):
             """Checks if there are no overlaps in the grid."""
             return super().is_valid(state, Decimal("0"), Decimal("0"))
-
 
     class TwoBlockProblem(Problem):
         """
         Meta-problem with two blocks that are pressed against each other.
         This problem combines two simple problems (SingleBlockProblem) into one.
-    
+
         State is a dictionary with parameters of both blocks and offsets:
         {
             'block1': {pair, a, b},  # State of the first block
@@ -354,7 +355,7 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
         }
         Blocks are placed side by side: block2 to the right of block1 considering offset_x and offset_y.
         """
-    
+
         def __init__(self, block1_problem, block2_problem, offset_delta=0.01):
             """
             block1_problem: instance of SingleBlockProblem for the first block
@@ -364,7 +365,7 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
             self.block1 = block1_problem
             self.block2 = block2_problem
             self.offset_delta = Decimal(str(offset_delta))
-    
+
         def get_initial_state(self):
             """Returns the initial state of both blocks."""
             # Calculate initial offset_x so that blocks are pressed against each other with a gap of 0.01
@@ -379,7 +380,7 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
             else:
                 block1_center_y = Decimal("0")
                 block1_max_x = Decimal("0")
-        
+
             # Calculate initial offset_x to press blocks against each other with a gap of 0.01
             block2_state = self.block2.get_initial_state()
             trees2 = self.block2.translate(block2_state, Decimal("0"), Decimal("0"))
@@ -389,7 +390,7 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
                 block2_max_y = Decimal(str(xys2.max(axis=0)[1]))
                 block2_min_x = Decimal(str(xys2.min(axis=0)[0]))
                 block2_center_y = (block2_min_y + block2_max_y) / Decimal("2")
-            
+
                 # offset_x should be such that:
                 # block1_max_x + 0.01 = block2_min_x + offset_x
                 # offset_x = block1_max_x + 0.01 - block2_min_x
@@ -398,7 +399,7 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
             else:
                 block2_center_y = Decimal("0")
                 initial_offset_x = block1_max_x + Decimal("0.01")
-        
+
             # Calculate initial offset_y to align block centers in Y
             if trees2:
                 # offset_y should be such that block centers align in Y
@@ -409,14 +410,14 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
                 initial_offset_y = block1_center_y - block2_center_y
             else:
                 initial_offset_y = Decimal("0")
-        
+
             return {
                 'block1': block1_state,
                 'block2': block2_state,
                 'offset_x': initial_offset_x,
                 'offset_y': initial_offset_y
             }
-    
+
         def translate(self, state):
             """
             Builds both blocks and places them side by side considering offset_x and offset_y.
@@ -424,19 +425,19 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
             """
             # Build the first block at the origin
             trees1 = self.block1.translate(state['block1'], Decimal("0"), Decimal("0"))
-        
+
             # Build the second block considering offset_x and offset_y
             offset_x = state.get('offset_x', Decimal("0"))
             offset_y = state.get('offset_y', Decimal("0"))
             trees2 = self.block2.translate(state['block2'], offset_x, offset_y)
-        
+
             return trees1 + trees2
-    
+
         def perturb(self, state):
             """
             Modifies the state of one of the blocks or offset_x/offset_y.
             Returns (new_state, rollback_data).
-        
+
             Probabilities:
             - Block 1: 30%
             - Block 2: 30%
@@ -446,19 +447,19 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
             # Choose the type of change with weights for more frequent offset changes
             # 0-2 = block1, 3-5 = block2, 6-7 = offset_x, 8-9 = offset_y
             move_type = random.randint(0, 9)
-        
+
             if move_type < 3:
                 # Modify block 1 (30%)
                 new_block_state, rollback_data = self.block1.perturb(state['block1'])
                 state['block1'] = new_block_state
                 return state, ('block', 'block1', rollback_data)
-        
+
             elif move_type < 6:
                 # Modify block 2 (30%)
                 new_block_state, rollback_data = self.block2.perturb(state['block2'])
                 state['block2'] = new_block_state
                 return state, ('block', 'block2', rollback_data)
-        
+
             elif move_type < 8:
                 # Modify offset_x (20%)
                 old_offset_x = state.get('offset_x', Decimal("0"))
@@ -468,7 +469,7 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
                     new_offset_x = old_offset_x
                 state['offset_x'] = new_offset_x
                 return state, ('offset_x', old_offset_x)
-        
+
             else:  # move_type >= 8
                 # Modify offset_y (20%)
                 old_offset_y = state.get('offset_y', Decimal("0"))
@@ -476,12 +477,12 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
                 new_offset_y = old_offset_y + doffset
                 state['offset_y'] = new_offset_y
                 return state, ('offset_y', old_offset_y)
-    
+
         def rollback(self, state, rollback_data):
             """Rolls back the state change."""
             if rollback_data is None:
                 return
-        
+
             if rollback_data[0] == 'block':
                 _, block_name, block_rollback_data = rollback_data
                 block = self.block1 if block_name == 'block1' else self.block2
@@ -492,7 +493,7 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
             elif rollback_data[0] == 'offset_y':
                 _, old_offset_y = rollback_data
                 state['offset_y'] = old_offset_y
-    
+
         def evaluate(self, state):
             """Calculates the bounding square side for both blocks (lower = better)."""
             all_trees = self.translate(state)
@@ -504,7 +505,7 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
             width = Decimal(str(max_x - min_x))
             height = Decimal(str(max_y - min_y))
             return max(width, height)
-    
+
         def is_valid(self, state):
             """Checks if there are no overlaps in both blocks and between them.
             Optimized: creates trees ONCE, then checks all pairs with AABB optimization.
@@ -513,10 +514,10 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
             all_trees = self.translate(state)
             if len(all_trees) <= 1:
                 return True
-        
+
             # Pre-compute bounds for all trees (fast AABB check)
             tree_bounds = [t.polygon.bounds for t in all_trees]  # (minx, miny, maxx, maxy)
-        
+
             # Check all pairs with AABB optimization
             for i, tree1 in enumerate(all_trees):
                 bounds1 = tree_bounds[i]
@@ -527,13 +528,13 @@ def _(Decimal, Problem, SingleBlockProblem, np, random):
                         if (bounds1[2] < bounds2[0] or bounds2[2] < bounds1[0] or
                             bounds1[3] < bounds2[1] or bounds2[3] < bounds1[1]):
                             continue  # AABB don't intersect, skip
-                    
+
                         # Only if AABB intersect, check exact intersection
                         if tree1.polygon.intersects(tree2.polygon) and not tree1.polygon.touches(tree2.polygon):
                             return False
-        
+
             return True
-    
+
         def clone_state(self, state):
             """Creates a copy of the state."""
             return {
@@ -565,7 +566,7 @@ def _(
         Universal Simulated Annealing algorithm.
         Works with any Problem without knowing the details of a specific task.
         """
-    
+
         def __init__(
             self,
             problem,
@@ -588,7 +589,7 @@ def _(
             self.save_history = save_history
             random.seed(random_state)
             np.random.seed(random_state)
-        
+
             # History for visualization (only if save_history=True)
             self.history = {
                 "iteration": [],
@@ -619,7 +620,7 @@ def _(
             # Initialization
             current_state = self.problem.get_initial_state()
             best_state = self.problem.clone_state(current_state)
-        
+
             current_value = self.problem.evaluate(current_state)
             best_value = current_value
             temperature = self.initial_temperature
@@ -643,7 +644,7 @@ def _(
                 improvements_in_pass = 0
                 accepted_in_pass = 0
                 rejected_in_pass = 0
-            
+
                 if self.verbose:
                     print(f"\n--- Pass {pass_num + 1}/{self.passes} ---")
                     print(f"Temperature: {temperature:.6f}")
@@ -702,14 +703,14 @@ def _(
                 # Exponential cooling (only cooling type)
                 temperature *= self.cooling_rate
                 temperature = max(temperature, self.min_temperature)
-            
+
                 # Log summary information for the pass in table format
                 if self.verbose:
                     if isinstance(self.problem, TreePackingProblem):
                         pair = best_state['pair']
                         a = best_state['a']
                         b = best_state['b']
-                    
+
                         # Beautiful table
                         print(f"\n  {'='*80}")
                         print(f"  Pass {pass_num + 1} Summary:")
@@ -730,7 +731,7 @@ def _(
                         block2 = best_state['block2']
                         offset_x = best_state.get('offset_x', Decimal("0"))
                         offset_y = best_state.get('offset_y', Decimal("0"))
-                    
+
                         # Beautiful table for two blocks
                         print(f"\n  {'='*80}")
                         print(f"  Pass {pass_num + 1} Summary:")
@@ -829,7 +830,7 @@ def _(
                 return self.problem.translate(state)
             else:
                 raise ValueError(f"get_trees_from_state is not supported for {self.problem.__class__.__name__}")
-    
+
         def plot_final_result(self, state, save_path=None):
             """
             Final result visualization.
@@ -963,22 +964,22 @@ def _(ChristmasTree, Decimal, SingleBlockProblem, TwoBlockProblem, math):
             # Get current coordinates relative to center
             rel_x = tree.center_x - center_x
             rel_y = tree.center_y - center_y
-    
+
             # Rotate by angle_deg degrees
             angle_rad = Decimal(str(angle_deg)) * Decimal(str(math.pi)) / Decimal("180")
             cos_a = Decimal(str(math.cos(float(angle_rad))))
             sin_a = Decimal(str(math.sin(float(angle_rad))))
-    
+
             new_rel_x = rel_x * cos_a - rel_y * sin_a
             new_rel_y = rel_x * sin_a + rel_y * cos_a
-    
+
             # New absolute coordinates
             new_x = center_x + new_rel_x
             new_y = center_y + new_rel_y
-    
+
             # New angle
             new_angle = (Decimal(str(tree.angle)) + Decimal(str(angle_deg))) % 360
-    
+
             # Create new tree
             rotated_tree = ChristmasTree(str(new_x), str(new_y), str(new_angle))
             rotated_trees.append(rotated_tree)
@@ -987,24 +988,24 @@ def _(ChristmasTree, Decimal, SingleBlockProblem, TwoBlockProblem, math):
 
     # Create initial pairs for each block
     # Block 1: 6x14
-    initial_trees_block1 = []
+    _initial_trees_block1 = []
     for _x, _y, _deg in [(-2.93069232+4.5, -4.24856960 + 6, 67), (-3.92971914+4.5, -4.16631769 + 6, 250.00)]:
-        initial_trees_block1.append(ChristmasTree(str(_x), str(_y), str(_deg)))
-        initial_pair1 = initial_trees_block1
+        _initial_trees_block1.append(ChristmasTree(str(_x), str(_y), str(_deg)))
+        _initial_pair1 = _initial_trees_block1
 
     # Block 2: 1x7 (rotated 90 degrees)
-    initial_trees_block2 = []
+    _initial_trees_block2 = []
     for _x, _y, _deg in [(-2.93069232+4.5, -4.24856960 + 9, 67), (-3.92971914+4.5, -4.16631769 + 9, 250.00)]:
-        initial_trees_block2.append(ChristmasTree(str(_x), str(_y), str(_deg)))
+        _initial_trees_block2.append(ChristmasTree(str(_x), str(_y), str(_deg)))
 
     # Rotate second pair by 90 degrees
-    initial_pair2, rotation_center = apply_rotation_test(initial_trees_block1, 90)
-    print(f"Rotation center for block 2: {rotation_center}")
+    _initial_pair2, _rotation_center = apply_rotation_test(_initial_trees_block1, 90)
+    print(f"Rotation center for block 2: {_rotation_center}")
 
     # Create two simple problems (blocks)
     # Block 1: a = 0.8744896974945239, b = 0.7499641699190263
-    block1_problem = SingleBlockProblem(
-        initial_pair=initial_pair1,
+    _block1_problem = SingleBlockProblem(
+        initial_pair=_initial_pair1,
         ncols=4,
         nrows=10,
         initial_a=0.8744896974945239+0.5,
@@ -1015,8 +1016,8 @@ def _(ChristmasTree, Decimal, SingleBlockProblem, TwoBlockProblem, math):
     )
 
     # Block 2: a and b are swapped
-    block2_problem = SingleBlockProblem(
-        initial_pair=initial_pair2,
+    _block2_problem = SingleBlockProblem(
+        initial_pair=_initial_pair2,
         ncols=1,
         nrows=4,
         initial_a=0.7499641699190263-0.1,  # b from block 1
@@ -1027,12 +1028,12 @@ def _(ChristmasTree, Decimal, SingleBlockProblem, TwoBlockProblem, math):
     )
 
     # Create meta-problem that combines two blocks
-    two_block_problem = TwoBlockProblem(block1_problem, block2_problem)
+    two_block_problem = TwoBlockProblem(_block1_problem, _block2_problem)
 
     print("Two-block problem created:")
-    print(f"  Block 1: {block1_problem.ncols} columns x {block1_problem.nrows} rows = {block1_problem.ncols * block1_problem.nrows * 2} trees")
-    print(f"  Block 2: {block2_problem.ncols} columns x {block2_problem.nrows} rows = {block2_problem.ncols * block2_problem.nrows * 2} trees")
-    print(f"  Total: {(block1_problem.ncols * block1_problem.nrows + block2_problem.ncols * block2_problem.nrows) * 2} trees")
+    print(f"  Block 1: {_block1_problem.ncols} columns x {_block1_problem.nrows} rows = {_block1_problem.ncols * _block1_problem.nrows * 2} trees")
+    print(f"  Block 2: {_block2_problem.ncols} columns x {_block2_problem.nrows} rows = {_block2_problem.ncols * _block2_problem.nrows * 2} trees")
+    print(f"  Total: {(_block1_problem.ncols * _block1_problem.nrows + _block2_problem.ncols * _block2_problem.nrows) * 2} trees")
     return (two_block_problem,)
 
 
@@ -1044,7 +1045,8 @@ def _(SimulatedAnnealing, two_block_problem):
         initial_temperature=0.01,      # Tmax
         min_temperature=0.000001,         # Tmin
         cooling_rate=0.99,              # alpha
-        passes=10,                      # nsteps
+        passes=1,                      # nsteps
+        # passes=10,                      # nsteps
         iterations_per_pass=10000,       # nsteps_per_T
         random_state=42,                # Seed for reproducibility
         verbose=True,                   # Detailed logging
@@ -1115,7 +1117,7 @@ def _(
         # side_length = max(width, height)
 
         side_length = width if width > height else height
-    
+
 
         square_x = minx if width >= height else minx - (side_length - width) / 2
         square_y = miny if height >= width else miny - (side_length - height) / 2
@@ -1188,6 +1190,49 @@ def _(
             })
     tree_data = pd.DataFrame(tree_data)
     tree_data.to_csv('results.csv', index=False)
+    return
+
+
+app._unparsable_cell(
+    r"""
+    csv_path = \"./submission_best.csv\"
+
+    # CSVを読み込む
+    result = pd.read_csv(csv_path)
+    result['x'] = result['x'].str.strip('s')
+    result['y'] = result['y'].str.strip('s')
+    result['deg'] = result['deg'].str.strip('s')
+    result[['group_id', 'item_id']] = result['id'].str.split('_', n=2, expand=True)
+
+    # グループごとにツリーを作成する
+    groups_data = {}
+    for group_id, group_data in result.groupby('groud_id'):
+        tree_list = [
+            ChristmasTree(center_x=row['x'], center_y=row['y'], angle=row['deg'])
+            for _, row in group_data.iterrows()
+        ]
+        groups_data[group_id] = tree_list
+
+    # グループをソート
+    sorted_groups = sorted(groups_data.items(), key=lambda x: int(x[0]))
+
+    # 最初の20グループを可視化する
+    page_groups = sorted_groups[0:20]
+
+    ncols = 5
+    nrows = 4
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=(20, 16), squeeze=False)
+    fig.suptitle(f'Santa 2025 - Groups 001 to 020', fontsize=16, fontweight='bold')
+
+    for idx, (group_id, trees) in enumerate(page_groups):
+    """,
+    name="_"
+)
+
+
+@app.cell
+def _():
     return
 
 
